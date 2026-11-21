@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>把提示词当接口设计 · 倪若冰 作品集</title>
+<meta name="description" content="倪若冰 · 上海大学 电影学院 数字媒体技术 2027 届。AI 角色对话系统、强化学习桌宠、自训音色朗读器——把模型的输出当成接口来设计。">
+<style>
+  :root{
+    --ink:#1B3A57; --txt:#23303C; --dim:#5A6B7B; --lgrey:#8C9AA8;
+    --line:#E3E8EE; --tint:#F7F9FB; --warm:#A8622F; --teal:#2F6E63;
+    --max:1120px;
+    --sans:"Microsoft YaHei","PingFang SC","Hiragino Sans GB","Source Han Sans SC",system-ui,sans-serif;
+    --mono:ui-monospace,"Cascadia Code",Consolas,"SF Mono",Menlo,monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:var(--sans); color:var(--txt); background:#fff;
+    font-size:16.5px; line-height:1.92;
+    -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+  }
+  a{color:inherit}
+  img{max-width:100%; display:block}
+  ::selection{background:#D7E6F2}
+
+  /* ── 进度条 ── */
+  .progress{position:fixed; top:0; left:0; right:0; height:2px; z-index:60; background:transparent}
+  .progress i{display:block; height:100%; width:0; background:var(--ink); transition:width .1s linear}
+
+  /* ── 顶栏 ── */
+  .topbar{
+    position:sticky; top:0; z-index:50;
+    display:flex; align-items:center; justify-content:space-between; gap:1rem;
+    padding:.85rem clamp(1rem,4vw,2.5rem);
+    background:rgba(255,255,255,.88); backdrop-filter:saturate(1.4) blur(10px);
+    border-bottom:1px solid var(--line);
+  }
+  .brand{font-weight:700; color:var(--ink); text-decoration:none; letter-spacing:.02em}
+  .brand span{color:var(--lgrey); font-weight:400; margin-left:.4rem; font-size:.9em}
+  .topbar nav{display:flex; align-items:center; gap:1.5rem; flex:1 1 auto; min-width:0; justify-content:flex-end}
+  .topbar nav a{
+    text-decoration:none; color:var(--dim); font-size:.92rem;
+    padding:.2rem 0; border-bottom:2px solid transparent; transition:.2s;
+  }
+  .topbar nav a:hover{color:var(--ink)}
+  .topbar nav a.on{color:var(--ink); border-bottom-color:var(--ink)}
+  .topbar .dl{
+    border:1px solid var(--ink); border-radius:4px; padding:.3rem .8rem;
+    color:var(--ink); font-size:.86rem; white-space:nowrap;
+  }
+  .topbar .dl:hover{background:var(--ink); color:#fff}
+
+  @media (max-width:820px){
+    .topbar nav{overflow-x:auto; scrollbar-width:none; gap:1.1rem}
+    .topbar nav::-webkit-scrollbar{display:none}
+    .topbar nav a{white-space:nowrap}
+    .brand span{display:none}
+  }
+
+  /* ── 版式 ── */
+  .wrap{max-width:var(--max); margin:0 auto; padding:0 clamp(1.1rem,4vw,2.5rem)}
+  section{padding:clamp(3.2rem,7vw,5.6rem) 0; scroll-margin-top:76px}
+  .tint{background:var(--tint)}
+  .rule{border:0; border-top:1px solid var(--line)}
+
+  .sec-num{
+    font-family:var(--mono); font-size:.76rem; letter-spacing:.22em;
+    color:var(--lgrey); text-transform:uppercase; margin-bottom:.7rem;
+  }
+  .sec-num b{color:var(--ink); font-weight:600}
+  h2{
+    font-size:clamp(1.5rem,2.9vw,2.15rem); line-height:1.42; color:var(--ink);
+    font-weight:700; letter-spacing:-.005em;
+  }
+  .lede{color:var(--dim); margin-top:1rem; max-width:820px}
+  .gap{height:1.6rem}
+  .gap-s{height:.9rem}
+  p+p{margin-top:.9rem}
+  strong{color:var(--ink); font-weight:700}
+  em{font-style:normal; color:var(--ink); background:linear-gradient(transparent 62%, #E8EFF5 62%)}
+  code{
+    font-family:var(--mono); font-size:.88em; color:#2A4A63;
+    background:#F1F4F7; padding:.1em .38em; border-radius:3px;
+  }
+
+  /* ── Hero ── */
+  .hero{padding-top:clamp(2.4rem,6vw,4.2rem)}
+  .eyebrow{font-family:var(--mono); font-size:.78rem; letter-spacing:.22em; color:var(--lgrey)}
+  h1{
+    font-size:clamp(2.1rem,5.4vw,3.6rem); line-height:1.24; color:var(--ink);
+    font-weight:700; letter-spacing:-.015em; margin:.9rem 0 1.6rem;
+  }
+  .hero .lede{font-size:clamp(1rem,1.5vw,1.14rem); color:var(--txt); max-width:860px}
+  .metrics{
+    display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:1.2rem;
+    margin:2.6rem 0 2.4rem; padding-top:1.6rem; border-top:1px solid var(--line);
+  }
+  .metric .v{font-family:var(--mono); font-size:clamp(1.25rem,2.3vw,1.75rem); color:var(--ink); font-weight:600; letter-spacing:-.02em}
+  .metric .k{font-size:.8rem; color:var(--lgrey); margin-top:.3rem; line-height:1.5}
+  @media (max-width:720px){ .metrics{grid-template-columns:repeat(3,1fr); gap:1.1rem .8rem} }
+
+  /* ── 图 ── */
+  figure{margin:2.2rem 0 0}
+  figure img{
+    width:100%; border-radius:6px; border:1px solid var(--line);
+    box-shadow:0 14px 40px rgba(27,58,87,.10); cursor:zoom-in;
+    transition:box-shadow .25s, transform .25s;
+  }
+  figure img:hover{box-shadow:0 20px 50px rgba(27,58,87,.18)}
+  figcaption{font-size:.84rem; color:var(--lgrey); margin-top:.75rem; text-align:center; line-height:1.7}
+  .figrow{display:grid; gap:1.6rem; margin-top:2.2rem}
+  .figrow.two{grid-template-columns:1fr 1fr}
+  .figrow figure{margin:0}
+  @media (max-width:720px){ .figrow.two{grid-template-columns:1fr} }
+
+  /* ── 表 ── */
+  .tablewrap{overflow-x:auto; margin-top:1.8rem; -webkit-overflow-scrolling:touch}
+  table{width:100%; border-collapse:collapse; font-size:.92rem; min-width:520px}
+  th,td{text-align:left; padding:.72rem .9rem; border-bottom:1px solid var(--line); vertical-align:top}
+  th{background:#EDF1F5; color:var(--ink); font-weight:700; font-size:.86rem; letter-spacing:.02em}
+  tr:hover td{background:#FAFCFD}
+  td:first-child{color:var(--ink)}
+  .nowrap{white-space:nowrap}
+  .dot{display:inline-block; width:9px; height:9px; border-radius:50%; background:var(--ink); vertical-align:middle}
+  .dot.h{background:none; border:1.5px solid #9FB0BF}
+  .legend{font-size:.86rem; color:var(--dim); margin-top:.9rem; display:flex; gap:1.6rem; align-items:center; flex-wrap:wrap}
+  .legend span{display:flex; align-items:center; gap:.45rem}
+
+  /* ── 代码 ── */
+  pre{
+    background:#F2F5F8; border:1px solid var(--line); border-left:3px solid var(--ink);
+    border-radius:5px; padding:1rem 1.2rem; overflow-x:auto; margin-top:1.4rem;
+    font-family:var(--mono); font-size:.84rem; line-height:1.75; color:#2A3B4C;
+  }
+  pre .c{color:var(--lgrey)}
+
+  /* ── 引用 ── */
+  blockquote{
+    margin:1.8rem 0; padding:.3rem 0 .3rem 1.2rem; border-left:2px solid var(--ink);
+    color:var(--dim); font-size:1.02rem;
+  }
+  blockquote strong{color:var(--ink)}
+
+  /* ── 卡片 ── */
+  .cards{display:grid; grid-template-columns:1fr 1fr; gap:1.1rem; margin-top:1.8rem}
+  @media (max-width:760px){ .cards{grid-template-columns:1fr} }
+  .card{
+    background:#fff; border:1px solid var(--line); border-left:3px solid var(--ink);
+    border-radius:5px; padding:1.15rem 1.3rem;
+  }
+  .tint .card{background:#fff}
+  .card h3{font-size:.98rem; color:var(--ink); margin-bottom:.4rem; font-weight:700}
+  .card p{font-size:.92rem; color:var(--dim); line-height:1.8}
+
+  /* ── 列表 ── */
+  ul.pts{list-style:none; margin-top:1.4rem; display:grid; gap:.75rem}
+  ul.pts li{position:relative; padding-left:1.2rem; color:var(--dim); font-size:.95rem}
+  ul.pts li::before{
+    content:""; position:absolute; left:0; top:.72em; width:6px; height:6px;
+    border-radius:50%; background:var(--lgrey);
+  }
+  ul.pts li strong{color:var(--ink)}
+
+  /* ── 联系 ── */
+  .contact{
+    margin-top:2.4rem; padding:1.6rem 1.8rem; border:1px solid var(--line);
+    border-radius:6px; background:#fff; display:flex; flex-wrap:wrap;
+    gap:.6rem 2.2rem; align-items:center; font-size:.95rem;
+  }
+  .contact .who{color:var(--ink); font-weight:700}
+  .contact a{color:var(--dim); text-decoration:none; border-bottom:1px solid var(--line)}
+  .contact a:hover{color:var(--ink); border-bottom-color:var(--ink)}
+  footer{padding:2.6rem 0 3.4rem; border-top:1px solid var(--line); color:var(--lgrey); font-size:.82rem}
+  footer .wrap{display:flex; justify-content:space-between; gap:1rem; flex-wrap:wrap}
+
+  /* ── Lightbox ── */
+  .lb{
+    position:fixed; inset:0; z-index:100; background:rgba(12,20,28,.94);
+    display:none; align-items:center; justify-content:center; padding:3vh 3vw; cursor:zoom-out;
+  }
+  .lb.on{display:flex}
+  .lb img{max-width:100%; max-height:94vh; border-radius:4px; box-shadow:0 30px 80px rgba(0,0,0,.6)}
+  .lb .close{
+    position:absolute; top:1.2rem; right:1.6rem; color:#fff; font-size:1.6rem;
+    line-height:1; opacity:.7; font-family:var(--mono);
+  }
+  .lb .hint{position:absolute; bottom:1.4rem; left:0; right:0; text-align:center; color:#8FA1B5; font-size:.8rem}
+
+  @media (prefers-reduced-motion:reduce){
+    html{scroll-behavior:auto}
+    *{transition:none!important}
+  }
+
+  @media print{
+    .topbar,.progress,.lb{display:none!important}
+    body{font-size:10.5pt}
+    section{padding:1.2cm 0; break-inside:avoid}
+    .tint{background:#fff}
+    figure img{box-shadow:none; cursor:default}
+    a{text-decoration:none}
+  }
+</style>
+</head>
+<body>
+
+<div class="progress"><i id="bar"></i></div>
+
+<header class="topbar">
+  <a class="brand" href="#top">倪若冰<span>作品集 · 2027 届</span></a>
+  <nav id="nav">
+    <a href="#overview">概览</a>
+    <a href="#arch">方法</a>
+    <a href="#verify">验证</a>
+    <a href="#demos">作品</a>
+    <a href="#fit">岗位</a>
+    <a class="dl" href="../docs/portfolio.pdf">下载 PDF</a>
+  </nav>
+</header>
+
+<main>
+
+<!-- ══════════ HERO ══════════ -->
+<section id="top" class="hero">
+  <div class="wrap">
+    <div class="eyebrow">作品集 · 2026</div>
+    <h1>把提示词<br>当接口设计</h1>
+    <p class="lede">这套系统里没有一个模型是我训的。我做的事只有一件：<strong>把模型的输出当成一种接口来设计</strong>，再用正则和前端把它接成能用的东西。</p>
+
+    <div class="metrics">
+      <div class="metric"><div class="v">1100</div><div class="k">单角色单存档轮次</div></div>
+      <div class="metric"><div class="v">10万</div><div class="k">全部存档累计回合</div></div>
+      <div class="metric"><div class="v">8831</div><div class="k">单次生成 token</div></div>
+      <div class="metric"><div class="v">13</div><div class="k">预设分块</div></div>
+      <div class="metric"><div class="v">9</div><div class="k">正则脚本</div></div>
+    </div>
+
+    <figure>
+      <img src="img/compare.jpg" alt="同一段输出，两种形态：左为模型原始输出，右为解析后渲染的界面">
+      <figcaption>同一段输出，两种形态。左边是模型吐的原文，右边是用户看到的界面。</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ══════════ 概览 ══════════ -->
+<section id="overview" class="tint">
+  <div class="wrap">
+    <div class="sec-num"><b>01</b> ／ 概览</div>
+    <h2>五件作品，五条能力线</h2>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>作品</th><th>提示词工程</th><th>前端与交互</th><th>模型与训练</th><th>工程与部署</th><th>内容设计</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>AI 角色对话系统</td><td><i class="dot"></i></td><td><i class="dot"></i></td><td><i class="dot h"></i></td><td><i class="dot"></i></td><td><i class="dot"></i></td></tr>
+          <tr><td>引力宠物（PPO）</td><td><i class="dot h"></i></td><td><i class="dot"></i></td><td><i class="dot"></i></td><td><i class="dot h"></i></td><td><i class="dot h"></i></td></tr>
+          <tr><td>长文朗读器</td><td><i class="dot h"></i></td><td><i class="dot"></i></td><td><i class="dot"></i></td><td><i class="dot"></i></td><td><i class="dot"></i></td></tr>
+          <tr><td>手机 OS 桌面</td><td><i class="dot h"></i></td><td><i class="dot"></i></td><td><i class="dot h"></i></td><td><i class="dot h"></i></td><td><i class="dot"></i></td></tr>
+          <tr><td>插件加载器</td><td><i class="dot"></i></td><td><i class="dot"></i></td><td><i class="dot h"></i></td><td><i class="dot h"></i></td><td><i class="dot h"></i></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="legend">
+      <span><i class="dot"></i> 主要证据</span>
+      <span><i class="dot h"></i> 有涉及</span>
+    </div>
+
+    <div class="gap"></div>
+    <p>前两件是主件，后三件是佐证。主件——AI 角色对话系统——占了这本册子一半篇幅，因为它同时压住了提示词、正则、前端三件事；后三件各占一节，用来证明这三件事不是只在一个项目里成立。</p>
+    <p>实习与科研不在本册：SMT 的虚拟舞台制作、CVPR 2026 的声音生成，写在简历里。这本册子只放我自己从零做完的东西。</p>
+  </div>
+</section>
+
+<!-- ══════════ 问题 ══════════ -->
+<section id="problem">
+  <div class="wrap">
+    <div class="sec-num"><b>02</b> ／ 问题</div>
+    <h2>一个聊天框，三条硬边界</h2>
+    <p class="lede">SillyTavern 本质上是一套提示词系统：预设结构决定这次发什么，模型返回文字，仅此而已。它能写得很动人，但用户看到的永远只有一行字。</p>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th style="width:20%">边界</th><th>具体表现</th><th style="width:28%">后果</th></tr></thead>
+        <tbody>
+          <tr><td>只有文字</td><td>角色说「我给你调了杯酒」，屏幕上还是那行字</td><td>沉浸感断裂</td></tr>
+          <tr><td>没有状态</td><td>时间、天气、随身物品、手机界面都不存在</td><td>角色活在真空里</td></tr>
+          <tr><td>没有记忆管理</td><td>上下文一长就遗忘、人设漂移、token 爆炸</td><td>长线剧情跑不动</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="gap"></div>
+    <p>我要做的不是「更好的提示词」，是给这套系统加一层运行时：让 AI 的输出不只是给人读的文本，而是给机器执行的指令。</p>
+
+    <blockquote><strong>标签即 API，正则即中间件，前端即运行时。</strong></blockquote>
+
+    <p>这条判断决定了后面所有设计：提示词要按接口写，正则要按中间件写，前端要按运行时写。三条路我都走通了，所以下面每一节都能给出可验收的东西。</p>
+  </div>
+</section>
+
+<!-- ══════════ 架构 ══════════ -->
+<section id="arch" class="tint">
+  <div class="wrap">
+    <div class="sec-num"><b>03</b> ／ 方法</div>
+    <h2>三层，七个模块</h2>
+
+    <figure>
+      <img src="img/arch.jpg" alt="系统架构：提示词层、主 AI、副 AI 编排、正则中间件、渲染层、记忆层">
+      <figcaption>图 1　系统架构：提示词层 / 主 AI / 副 AI 编排 / 正则中间件 / 渲染层 / 记忆层</figcaption>
+    </figure>
+
+    <div class="gap"></div>
+    <p><strong>为什么是三个 AI。</strong> 单一模型要同时负责「写得好看」和「判断哪里该交互」，两个目标会互相打架。拆成三段流水线——主 AI 只写正文，副 AI-1 判定互动点，副 AI-2 只生成前端代码——文字质量不下降，两段副 AI 的上下文干净，出错能定位、能单独重跑。</p>
+    <p><strong>代价也要说。</strong> 三个模型的成本高于一个。我只在「长线剧情」这一个场景里证明了它值；换到短对话密集的场景，单模型更划算，这一点我不打算含糊。</p>
+  </div>
+</section>
+
+<!-- ══════════ 预设 ══════════ -->
+<section id="preset">
+  <div class="wrap">
+    <div class="sec-num"><b>04</b> ／ 预设</div>
+    <h2>6300 字，切成 13 块</h2>
+    <p class="lede">提示词不是一篇文章，是十三个可单独替换的模块。</p>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th style="width:16%">类别</th><th>块</th><th style="width:10%">数量</th><th style="width:22%">换角色时</th></tr></thead>
+        <tbody>
+          <tr><td><strong>骨架</strong></td><td>认知隔离 · 行文规则 · 正文约束 · 思考模板</td><td>4</td><td>不动</td></tr>
+          <tr><td><strong>皮肤</strong></td><td>身份 · 文风 · 禁词 · 角色与世界观槽位</td><td>4</td><td>重写</td></tr>
+          <tr><td><strong>接口</strong></td><td>时间锚点 · 播放器格式</td><td>2</td><td>改一处，正则要同步</td></tr>
+          <tr><td>半可变</td><td>叙事要求 · 角色塑造 · 用户输入槽位</td><td>3</td><td>微调</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p style="margin-top:1.4rem"><strong>换角色 = 只动 4 块，其余 9 块不动。</strong> 这是「框架」和「一篇文章」的区别。切块带来的不只是整洁——不切块就没法做 A/B：只换一块、其余不变，才知道到底是哪条规则在起作用。</p>
+
+    <ul class="pts">
+      <li><strong>规则要可判定，不要可形容。</strong>「写得自然一点」无法验收，「禁用这 15 个词」可以。禁词表那一块整块都是负面清单，因为具体反例比抽象形容有效得多。</li>
+      <li><strong>把检查表外置成模板。</strong> 思考模板要求模型在写正文前逐项回答：时间、位置、人物关系、在场的人知道什么、文风限制、字数预算。这不是让它多想，是把我会做的检查变成它必须走一遍的流程。</li>
+      <li><strong>输出格式就是接口。</strong> 时间锚点与播放器格式这两块不是文风要求：<code>&lt;bbs_start&gt;</code> 的格式由记忆层消费，<code>&lt;music_recommend&gt;</code> 的字段由播放器消费。改一个字段名，正则静默失效。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ══════════ 正则 ══════════ -->
+<section id="regex" class="tint">
+  <div class="wrap">
+    <div class="sec-num"><b>05</b> ／ 正则</div>
+    <h2>正则不是滤镜，是中间件</h2>
+    <p class="lede">九条脚本分三组：显示层清理、提示词层清理、结构安全网。</p>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th style="width:8%">#</th><th>做什么</th><th style="width:24%">改哪边</th></tr></thead>
+        <tbody>
+          <tr><td>01</td><td>剥离 disclaimer / 思维链 / planning 等脚手架</td><td>显示 + 提示词</td></tr>
+          <tr><td>02</td><td>抹掉 planning 内部出现的 XML 标签</td><td>显示</td></tr>
+          <tr><td>03</td><td>同上，针对旧一代 <code>&lt;think&gt;</code></td><td>显示 + 提示词</td></tr>
+          <tr><td>04</td><td>删「叙述者觉得」这类旁白越界</td><td>显示 + 提示词</td></tr>
+          <tr><td>05</td><td>从提示词里抹掉禁词</td><td>仅提示词</td></tr>
+          <tr><td>06</td><td>把音乐块从上下文剔除</td><td>仅提示词</td></tr>
+          <tr><td>07</td><td>中文之间的破折号转逗号；08 对白包进 <code>&lt;cite&gt;</code>（两条目前关闭）</td><td>显示</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="gap"></div>
+    <p><strong>第一条判断：显示层和提示词层必须分开治。</strong> 用户不该看到 <code>&lt;/konatan_planning~&gt;</code>；模型更不该在历史里读到禁词，否则它会模仿。</p>
+
+<pre><span class="c"># 05 · 禁词下沉  ——  只作用提示词</span>
+findRegex      /极其|由于|共犯|并不存在的/g
+replaceString  ""
+promptOnly     true</pre>
+
+    <p>常规做法是「输出里出现禁词就删掉」。我改成让禁词根本进不了上下文：拦截输出只能补救，消源才能不复发。</p>
+
+    <p><strong>第二条判断：正则之间的顺序本身就是逻辑。</strong> 09 要把 planning 渲染成卡片，01 要把 planning 整段删掉——作用于同一段文本，结论相反。顺序只能是 09 先、01 后：先消费掉原始标签，后面的才匹配不到。反过来，卡片永远不出现。</p>
+  </div>
+</section>
+
+<!-- ══════════ 验收 ══════════ -->
+<section id="verify">
+  <div class="wrap">
+    <div class="sec-num"><b>06</b> ／ 验收</div>
+    <h2>规则是可以验收的</h2>
+    <p class="lede">把预设里可量化的 13 条要求，拿到一份真实产出上逐条检索。只统计正文段，不含思考与标签。</p>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th style="width:34%">规则</th><th style="width:22%">要求</th><th>实际</th></tr></thead>
+        <tbody>
+          <tr><td>对白禁「说道问」</td><td>0</td><td>1 处，且在对白内</td></tr>
+          <tr><td>只用暗喻</td><td>0 明喻</td><td>0 处「像 / 仿佛」</td></tr>
+          <tr><td>杀死主观描写</td><td>0</td><td>0 处「觉得」</td></tr>
+          <tr><td>禁止数字 3</td><td>0</td><td>0（用两、四、五、十九、四十规避）</td></tr>
+          <tr><td>不用括号解释</td><td>0</td><td>0</td></tr>
+          <tr><td>对白占比</td><td>≥ 40%</td><td><strong>42.5%</strong></td></tr>
+          <tr><td>正文字数</td><td>≥ 1300 token</td><td><strong>2067 字</strong></td></tr>
+          <tr><td>时间锚点</td><td>首尾各一次、年份不省</td><td>19:15 → 19:28</td></tr>
+          <tr><td><strong>planning 字数</strong></td><td><strong>≤ 1500</strong></td><td><strong>2209</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="gap"></div>
+    <p>十三条里十二条对得上。最后一行是故意留的。</p>
+    <p><strong>规则写出来不等于规则被执行。</strong> 那条 planning 上限没做到，原因是零设定放大了思考负担，而我把规则写成了「下限」而不是「上限」。这类失效不会报错，只会慢慢扩散——所以必须定期抽检、重读产出、删掉失效规则。</p>
+
+    <blockquote>一份能通过验收的输出，比十页「我擅长提示词工程」有用。</blockquote>
+  </div>
+</section>
+
+<!-- ══════════ 演示 ══════════ -->
+<section id="demos" class="tint">
+  <div class="wrap">
+    <div class="sec-num"><b>07</b> ／ 作品</div>
+    <h2>三个 demo，三种能力</h2>
+
+    <figure>
+      <img src="img/arcade.jpg" alt="街机：正文里长出一台真能打的街机">
+      <figcaption>图 2　街机：正文里长出一台真能打的街机，2P 协战，通关才解锁后续剧情</figcaption>
+    </figure>
+
+    <div class="figrow two">
+      <figure>
+        <img src="img/create.jpg" alt="AI 现场创作：一句话写出插件源码">
+        <figcaption>图 3　AI 现场创作：一句话 → 写出插件源码 → 安装并开局</figcaption>
+      </figure>
+      <figure>
+        <img src="img/notes.jpg" alt="手机 OS 桌面：138 条便签">
+        <figcaption>图 4　手机 OS 桌面：138 条便签 / 动态 / 息屏</figcaption>
+      </figure>
+    </div>
+
+    <div class="gap"></div>
+    <p>三个 demo 分别对应三件事：<strong>叙事门禁</strong>（交互结果决定剧情能否推进）、<strong>界面可扩展</strong>（AI 能生成界面本身）、<strong>第二个屏幕</strong>（对话之外的状态承载）。</p>
+    <p>第三个最像平台：它不是「AI 能调用工具」，是 AI 能往一个正在运行的系统里装一个新应用。</p>
+  </div>
+</section>
+
+<!-- ══════════ 坑 ══════════ -->
+<section id="pits">
+  <div class="wrap">
+    <div class="sec-num"><b>08</b> ／ 复盘</div>
+    <h2>四个坑，每个都改了设计</h2>
+
+    <div class="cards">
+      <div class="card">
+        <h3>坑 1 · 不让跑 JS</h3>
+        <p>限制是保护，不是 bug。硬改会破坏升级路径。最后选择「不改本体、只在前端挂载」，代价是自己处理组件生命周期与样式隔离。</p>
+      </div>
+      <div class="card">
+        <h3>坑 2 · 交互提前剧透</h3>
+        <p>用户看到「门开了」再点「开门」，交互就成了摆设。改成「折叠后续正文，动作完成后展开」才成立。<strong>交互的时间顺序，比交互本身更重要。</strong></p>
+      </div>
+      <div class="card">
+        <h3>坑 3 · 上下文爆炸</h3>
+        <p>把历史全塞进去，几轮之后就又慢又贵还失忆。改成向量召回 + 递进摘要 + 「故事 / 信息」二分，才把 8831 token 稳住。<strong>事件会过期，人设不会。</strong></p>
+      </div>
+      <div class="card">
+        <h3>坑 4 · 规则会失效</h3>
+        <p>见上一节：写着 1500 字，实际 2209。这条坑的特别之处是它不报错，只能靠主动抽检发现。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ 桌宠 ══════════ -->
+<section id="pet" class="tint">
+  <div class="wrap">
+    <div class="sec-num"><b>09</b> ／ 作品</div>
+    <h2>小桌宠：让 AI 自己学出一张好坏地图</h2>
+
+    <figure>
+      <img src="img/pet.jpg" alt="引力宠物：AI 接管一颗被黑洞牵引的小球">
+      <figcaption>图 5　引力宠物：AI 接管一颗被黑洞牵引的小球，躲红色菱形、吃黄色光点</figcaption>
+    </figure>
+
+    <div class="gap"></div>
+    <p>这颗小球不是靠脚本躲的。我用 PPO 训了一个策略，它看到的不是障碍物坐标，而是一张<strong>好坏地图</strong>：对小球周围 12 个方向 × 3 个距离共 36 个采样点打分。</p>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>采样点情况</th><th>分值</th></tr></thead>
+        <tbody>
+          <tr><td>踩上去会死</td><td>−100</td></tr>
+          <tr><td>擦边而过</td><td>+2</td></tr>
+          <tr><td>安全但远</td><td>+0.3 ~ +0.5</td></tr>
+          <tr><td>加分球附近</td><td>+3 ~ +5</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p style="margin-top:1.4rem">预知性也做进了奖励：炸弹按剩余时间插值到爆炸半径，弹球按速度方向预测位置。于是它自然会沿着高分区域画出曲线，而不是贴着障碍物做离散判断。</p>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th style="width:26%">项</th><th>设置</th></tr></thead>
+        <tbody>
+          <tr><td>算法 / 环境</td><td>PPO（stable-baselines3）· 16 个并行环境</td></tr>
+          <tr><td>训练步数 / 网络</td><td>5000 万步 · 128 × 128</td></tr>
+          <tr><td>课程</td><td>4 阶段：空场控制 → 闪避 → 全障碍加速度 → 曲线美感</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p style="margin-top:1.4rem">四个阶段用 <code>phase.txt</code> 在训练中热切换，不用从头重训；训练脚本支持断点续练与 TensorBoard 监控。</p>
+  </div>
+</section>
+
+<!-- ══════════ 朗读 ══════════ -->
+<section id="voice">
+  <div class="wrap">
+    <div class="sec-num"><b>10</b> ／ 作品</div>
+    <h2>把一篇文章变成 154 段可朗读的语音</h2>
+
+    <div class="figrow two">
+      <figure>
+        <img src="img/voice.jpg" alt="长文朗读：154 段逐段合成">
+        <figcaption>图 6　长文朗读：154 段逐段合成，状态可见</figcaption>
+      </figure>
+      <figure>
+        <img src="img/voice-console.jpg" alt="合成流水线">
+        <figcaption>图 7　合成流水线：切句 → BERT 特征 → 语义 token → 波形</figcaption>
+      </figure>
+    </div>
+
+    <div class="gap"></div>
+    <p>难点不在「能合成」，在「能连续听一小时」。</p>
+
+    <ul class="pts">
+      <li><strong>断句粒度决定听感。</strong> 按标点切到句子级，段太长气口乱，太短又碎。</li>
+      <li><strong>状态要可见。</strong> 每段标出「待合成 / 直接 / 播放中」，用户才知道卡在哪一段。</li>
+      <li><strong>缓存决定能不能听长文。</strong> 合成过的段落存下来，重听、跳段、导出都不用重跑；不缓存的话，154 段每次都要重来。</li>
+      <li><strong>音色是本地的。</strong> 用 GPT-SoVITS 自己收语料训的音色，17 秒音频约 10 秒生成，不进公网、不依赖第三方 TTS。</li>
+    </ul>
+
+    <p style="margin-top:1.4rem">底部是实际在用的控制：连续播放、定时 30 分钟、收藏、导出音频。</p>
+  </div>
+</section>
+
+<!-- ══════════ 工具 ══════════ -->
+<section id="tools" class="tint">
+  <div class="wrap">
+    <div class="sec-num"><b>11</b> ／ 工具</div>
+    <h2>用到的工具</h2>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th style="width:18%">类别</th><th style="width:38%">用什么</th><th>用在哪</th></tr></thead>
+        <tbody>
+          <tr><td>语言</td><td>Python · JavaScript</td><td>全部</td></tr>
+          <tr><td>前端</td><td>原生 JS / CSS / HTML 注入</td><td>运行层 · 手机 OS · 朗读器</td></tr>
+          <tr><td>提示词</td><td>自建 13 块预设结构</td><td>AI 角色对话系统</td></tr>
+          <tr><td>正则</td><td>SillyTavern Regex（9 条）</td><td>同上</td></tr>
+          <tr><td>强化学习</td><td>stable-baselines3 · PPO</td><td>引力宠物</td></tr>
+          <tr><td>语音</td><td>GPT-SoVITS（自训音色）</td><td>长文朗读器</td></tr>
+          <tr><td>生图</td><td>ComfyUI · 即梦 · 生图 API</td><td>对话内插画 · SMT 舞台</td></tr>
+          <tr><td>部署</td><td>Linux · Docker · GPU 工作站</td><td>CVPR 项目 · 本地推理</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ 岗位 ══════════ -->
+<section id="fit">
+  <div class="wrap">
+    <div class="sec-num"><b>12</b> ／ 岗位</div>
+    <h2>这些能力，对应哪些岗位</h2>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th style="width:30%">岗位常见要求</th><th>我的证据</th></tr></thead>
+        <tbody>
+          <tr><td>熟悉大模型提示词工程</td><td>6300 字预设切 13 块，骨架可跨角色复用；13 条规则逐条验收</td></tr>
+          <tr><td>能把 AI 接进内容生产流程</td><td>标签协议 + 9 条正则中间件，模型输出直接驱动界面</td></tr>
+          <tr><td>能独立部署与调试 AI 环境</td><td>本地 GPT-SoVITS 自训音色；CVPR 项目服务器复现</td></tr>
+          <tr><td>懂交互与前端</td><td>悬念折叠、手机 OS 桌面、AI 现场写应用</td></tr>
+          <tr><td>有 AIGC 内容制作经验</td><td>SMT 三个虚拟舞台、单舞台十余版素材（见简历）</td></tr>
+          <tr><td>能把一个想法做完</td><td>五件作品，每件都从 0 做到能跑</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="gap"></div>
+    <p>这五件作品有一个共同点：都不是「演示」，是每天在用的东西。桌宠我玩了很久，朗读器在通勤路上听，对话系统跑了 1100 轮才敢拿出来。</p>
+    <p><strong>可以现场看的</strong>：桌宠是一个 HTML 文件，双击就能玩；朗读器在本地跑；对话系统要账号或本地部署，面试时可约演示。</p>
+
+    <div class="contact">
+      <span class="who">倪若冰</span>
+      <a href="tel:15316737468">15316737468</a>
+      <a href="mailto:951279849@qq.com">951279849@qq.com</a>
+      <a href="https://github.com/Zircon-White" target="_blank" rel="noopener">github.com/Zircon-White</a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>倪若冰 · 上海大学 电影学院 · 数字媒体技术 · 2027 届</span>
+    <span>本页所有图片可点击放大</span>
+  </div>
+</footer>
+
+<div class="lb" id="lb">
+  <span class="close">✕</span>
+  <img id="lbimg" alt="">
+  <span class="hint">点击任意处或按 Esc 关闭</span>
+</div>
+
+<script>
+(function(){
+  var bar = document.getElementById('bar');
+  var links = Array.prototype.slice.call(document.querySelectorAll('#nav a[href^="#"]'));
+  var targets = links.map(function(a){ return document.querySelector(a.getAttribute('href')); });
+
+  function onScroll(){
+    var h = document.documentElement;
+    var p = h.scrollTop / (h.scrollHeight - h.clientHeight || 1);
+    bar.style.width = Math.min(100, p * 100) + '%';
+
+    var mark = window.scrollY + 140, best = 0;
+    for (var i = 0; i < targets.length; i++){
+      if (targets[i] && targets[i].offsetTop <= mark) best = i;
+    }
+    links.forEach(function(a, i){ a.classList.toggle('on', i === best); });
+  }
+  window.addEventListener('scroll', onScroll, {passive:true});
+  window.addEventListener('resize', onScroll);
+  onScroll();
+
+  // 图片放大
+  var lb = document.getElementById('lb'), lbimg = document.getElementById('lbimg');
+  document.addEventListener('click', function(e){
+    var img = e.target.closest('figure img');
+    if (img){ lbimg.src = img.src; lbimg.alt = img.alt; lb.classList.add('on'); document.body.style.overflow = 'hidden'; }
+  });
+  function close(){ lb.classList.remove('on'); document.body.style.overflow = ''; }
+  lb.addEventListener('click', close);
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') close(); });
+})();
+</script>
+</body>
+</html>
